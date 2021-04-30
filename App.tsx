@@ -19,53 +19,55 @@ import {
   View,
 } from 'react-native';
 
-const numRows = 40;
+const numRows = __DEV__ ? 6 : 200;
 const numColumns = 4;
-const avgDurationPlaceholder = '–';
 
 const App: FC = () => {
-  const renderDurationsRef = useRef<number[]>([]);
-  const [avgRenderDuration, setAvgRenderDuration] = useState(
-    avgDurationPlaceholder,
-  );
+  const [avgRenderDuration, setAvgRenderDuration] = useState(0);
+  const [renderDuration, setRenderDuration] = useState(0);
   const [renderCount, setRenderCount] = useState(1);
 
   const rerenderPizzas = useCallback(() => {
-    renderDurationsRef.current = [];
     setRenderCount(prevCount => prevCount + 1);
   }, []);
 
-  const onPizzaRender = useCallback(
-    (_id: string, _phase: 'mount' | 'update', actualDuration: number) => {
-      renderDurationsRef.current.push(actualDuration);
-    },
-    [],
-  );
+  const onPizzaRender = useCallback(() => {}, []);
 
+  const prevTimeRef = useRef<number>(Date.now());
+
+  // file a rerender every sec.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAvgRenderDuration(
-        renderDurationsRef.current.length
-          ? `${mean(renderDurationsRef.current).toPrecision(4)}ms`
-          : avgDurationPlaceholder,
-      );
-    }, 500);
+    const curTime = Date.now();
+    const duration = curTime - prevTimeRef.current;
+    prevTimeRef.current = curTime;
 
-    return () => clearInterval(interval);
-  }, []);
+    const timer = setTimeout(() => {
+      setRenderDuration(duration);
+      setAvgRenderDuration(
+        (avgRenderDuration * (renderCount - 1) + duration) / renderCount,
+      );
+      rerenderPizzas();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  });
 
   return (
     <SafeAreaView>
       <ScrollView>
-        <Button title="Rerender Pizzas" onPress={rerenderPizzas} />
+        <Button title="Auto Rerender 800 Pizzas" onPress={rerenderPizzas} />
         <Text style={styles.isUsingHermes}>
           Using Hermes: {(global as any).HermesInternal ? 'YES' : 'NO'}
         </Text>
+        <Text style={styles.totalNumPizzas}>Is Dev: {`${__DEV__}`}</Text>
         <Text style={styles.totalNumPizzas}>
           Num Pizzas: {(numColumns * numRows).toLocaleString()}
         </Text>
         <Text style={styles.avgRenderDuration}>
-          Avg Pizza Render Duration: {avgRenderDuration}
+          Avg App Rerender Duration: {`${avgRenderDuration.toPrecision(5)}ms`}
+        </Text>
+        <Text style={styles.avgRenderDuration}>
+          Current Render Duration: {`${renderDuration}ms`}
         </Text>
         {times(numRows).map(rowIndex => (
           <View style={styles.row} key={rowIndex}>
